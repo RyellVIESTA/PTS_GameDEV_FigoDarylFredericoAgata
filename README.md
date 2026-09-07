@@ -1,2 +1,4 @@
-# PTS_GameDEV_FigoDarylFredericoAgata
-PTS Game DEV 
+# Project Coin Collector 
+Figo Daryl Frederico Agata
+07
+11 PPLG 3
