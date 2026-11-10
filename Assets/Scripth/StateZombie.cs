@@ -1,11 +1,7 @@
-using UnityEngine;
-
-public enum StateZombie 
+public enum StateZombie
 {
-    IDLE, // Diam Menunggu
-    PATROL, // Berkeliling
-    CHASE, // Mengejar 
-    ATTACK // Menyerang
-
-
+    IDLE,
+    PATROL,
+    CHASE,
+    ATTACK
 }

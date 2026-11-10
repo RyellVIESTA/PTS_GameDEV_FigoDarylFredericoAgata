@@ -1,69 +1,189 @@
+
 using UnityEngine;
 
 public class Enemy : MonoBehaviour, Idamageable
 {
+    [Header("Enemy Stats")]
+    [SerializeField] private int hp = 100;
+    [SerializeField] private int damage = 20;
+    public float MS = 2f;
 
-    [SerializeField] private int hp = 100; // Health Points
-    public float MS = 2f; // Movement Speed
-    protected Transform player;
+    [Header("Detection")]
+    [SerializeField] private float jarakDeteksi = 6f;
+    [SerializeField] private float jarakSerang = 1.2f;
+    [SerializeField] private float jedaSerang = 1f;
 
-    [Header("Pengaturan State Machine")]
-    [SerializeField] private float jarakDeteksi = 6f; // Jarak untuk mendeteksi player
-    [SerializeField] private float jarakSerang = 1.2f; // Jarak untuk menyerang player
-    [SerializeField] private float jedaSerang = 1f; // Jeda waktu antara serangan
+    [Header("Explosion")]
+    [SerializeField] private GameObject explosionPrefab;
+    private bool sudahMeledak = false;
 
-    private StateZombie currentState = StateZombie.IDLE; // State awal
-    private float waktuSerangTerakhir; // Waktu terakhir menyerang
+    [Header("Spawner")]
+    private EnemySpawner enemySpawner;
+
+    private Transform player;
+    private Idamageable targetDamageable;
+    private Animator animator;
+
+    private StateZombie currentState = StateZombie.IDLE;
+    private float waktuSerangTerakhir;
+
+    // Variabel animasi
+    private Vector2 arahTerakhir = Vector2.down;
+    private float idleTimer = 0f;
+    public float idleDelay = 0.15f;
+
+    // Menghubungkan enemy dengan spawner
+    public void SetSpawner(EnemySpawner spawner)
+    {
+        enemySpawner = spawner;
+    }
+
+    void Awake()
+    {
+        animator = GetComponentInChildren<Animator>();
+    }
+
     private void Start()
     {
-        if (player == null)
+        GameObject playerObject =
+            GameObject.FindGameObjectWithTag("Player");
+
+        if (playerObject != null)
         {
-            player = GameObject.FindGameObjectWithTag("Player").transform;
+            player = playerObject.transform;
+            targetDamageable =
+                playerObject.GetComponent<Idamageable>();
+        }
+        else
+        {
+            Debug.LogWarning(
+                "Player dengan tag 'Player' tidak ditemukan."
+            );
         }
     }
 
-    // Update is called once per frame
-    void Update()
-    {   
-        // PeriksaTransisi();
+    private void Update()
+    {
+        if (sudahMeledak) return;
 
-        // switch (currentState)
-        // {
-        //     case StateZombie.IDLE:  PerilakuIdle(); break;
-        //     case StateZombie.PATROL:  PerilakuPatrol(); break;
-        //     case StateZombie.CHASE:  PerilakuChase(); break;
-        //     case StateZombie.ATTACK:  PerilakuAttack(); break;
-        // }
+        PeriksaTransisi();
+
+        switch (currentState)
+        {
+            case StateZombie.IDLE:
+                PerilakuIdle();
+                break;
+
+            case StateZombie.PATROL:
+                PerilakuPatrol();
+                break;
+
+            case StateZombie.CHASE:
+                PerilakuChase();
+                break;
+
+            case StateZombie.ATTACK:
+                PerilakuAttack();
+                break;
+        }
     }
 
-
     public void Kejar()
-
     {
-
         if (player == null) return;
 
+        Vector2 posisiAwal = transform.position;
+
         transform.position = Vector2.MoveTowards(
-
             transform.position,
-
             player.position,
-
             MS * Time.deltaTime
-
         );
 
+        Vector2 arahGerak =
+            (Vector2)transform.position - posisiAwal;
+
+        bool sedangBergerak =
+            arahGerak.sqrMagnitude > 0.0001f;
+
+        if (sedangBergerak)
+        {
+            arahTerakhir = arahGerak.normalized;
+            idleTimer = 0f;
+        }
+        else
+        {
+            idleTimer += Time.deltaTime;
+        }
+
+        AturAnimasi(sedangBergerak);
+
+        Debug.Log("Enemy bergerak: " + sedangBergerak);
+    }
+
+    private void AturAnimasi(bool sedangBergerak)
+    {
+        if (animator == null) return;
+
+        animator.SetFloat("movex", arahTerakhir.x);
+        animator.SetFloat("movey", arahTerakhir.y);
+
+        float animationSpeed =
+            sedangBergerak || idleTimer < idleDelay ? 1f : 0f;
+
+        animator.SetFloat("speed", animationSpeed);
     }
 
     public virtual void serang()
     {
-        Debug.Log("Serang player");
+        if (targetDamageable == null || sudahMeledak) return;
+
+        if (Time.time >= waktuSerangTerakhir + jedaSerang)
+        {
+            targetDamageable.TakeDamage(damage);
+            waktuSerangTerakhir = Time.time;
+
+            Meledak();
+        }
+    }
+
+    private void Meledak()
+    {
+        if (sudahMeledak) return;
+
+        sudahMeledak = true;
+
+        if (explosionPrefab != null)
+        {
+            Instantiate(
+                explosionPrefab,
+                transform.position,
+                Quaternion.identity
+            );
+        }
+
+        // Spawn enemy baru setelah meledak
+        if (enemySpawner != null)
+        {
+            enemySpawner.SpawnEnemy();
+        }
+        else
+        {
+            Debug.LogWarning("EnemySpawner belum terhubung!");
+        }
+
+        Destroy(gameObject);
     }
 
     public void TakeDamage(int damage)
     {
+        if (sudahMeledak) return;
+
         hp -= damage;
-        Debug.Log($"{gameObject.name} took {damage} damage. Remaining HP: {hp}");
+
+        Debug.Log(
+            $"{gameObject.name} terkena {damage} damage. Sisa HP: {hp}"
+        );
 
         if (hp <= 0)
         {
@@ -73,17 +193,22 @@ public class Enemy : MonoBehaviour, Idamageable
 
     private void Die()
     {
-        Debug.Log($"{gameObject.name} has died.");
+        Debug.Log($"{gameObject.name} mati.");
         Destroy(gameObject);
     }
 
     public float JarakKePlayer()
     {
-        if (player == null) return Mathf.Infinity;
-        return Vector2.Distance(transform.position, player.position);
+        if (player == null)
+            return Mathf.Infinity;
+
+        return Vector2.Distance(
+            transform.position,
+            player.position
+        );
     }
 
-    void PeriksaTransisi()
+    private void PeriksaTransisi()
     {
         float jarak = JarakKePlayer();
 
@@ -101,28 +226,37 @@ public class Enemy : MonoBehaviour, Idamageable
         }
     }
 
-    void PerilakuIdle()
+    private void PerilakuIdle()
     {
-        
+        idleTimer += Time.deltaTime;
+        AturAnimasi(false);
     }
 
-    void PerilakuPatrol()
+    private void PerilakuPatrol()
     {
-        // Implementasi perilaku saat dalam state PATROL
-        Debug.Log("Zombie is patrolling.");
+        idleTimer += Time.deltaTime;
+        AturAnimasi(false);
     }
 
-    void PerilakuChase()
+    private void PerilakuChase()
     {
         Kejar();
-        // Implementasi perilaku saat dalam state CHASE
-        Debug.Log("Zombie is chasing the player.");
     }
 
-    void PerilakuAttack()
+    private void PerilakuAttack()
     {
-        // Implementasi perilaku saat dalam state ATTACK
-        Debug.Log("Zombie is attacking the player.");
+        if (player != null)
+        {
+            Vector2 arahPlayer =
+                (Vector2)(player.position - transform.position);
+
+            if (arahPlayer.sqrMagnitude > 0.01f)
+                arahTerakhir = arahPlayer.normalized;
+        }
+
+        idleTimer += Time.deltaTime;
+        AturAnimasi(false);
+
         serang();
     }
 }

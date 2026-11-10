@@ -3,28 +3,62 @@ using TMPro;
 
 public class GameManager : MonoBehaviour
 {
+    [Header("Koin")]
     public int totalKoin;
     private int koinTerkumpul = 0;
-    public TMP_Text TextMenang;
 
-    void Start()
+    [Header("UI")]
+    public TMP_Text TextMenang;
+    public TMP_Text TextKalah;
+
+    private bool gameEnded = false;
+
+    private void Start()
     {
-        // Hitung jumlah koin di scene saat mulai
         totalKoin = GameObject.FindGameObjectsWithTag("Coin").Length;
+
+        if (TextMenang != null)
+            TextMenang.gameObject.SetActive(false);
+
+        if (TextKalah != null)
+            TextKalah.gameObject.SetActive(false);
+
+        Time.timeScale = 1f;
     }
 
     public void AmbilKoin()
     {
+        if (gameEnded) return;
+
         koinTerkumpul++;
 
-        // Jika semua koin sudah diambil
-        if (koinTerkumpul == totalKoin)
+        if (koinTerkumpul >= totalKoin)
             Menang();
     }
 
-    void Menang()
+    public void Menang()
     {
+        if (gameEnded) return;
+
+        gameEnded = true;
         Debug.Log("KAMU MENANG!");
-        TextMenang.gameObject.SetActive(true);
+
+        if (TextMenang != null)
+            TextMenang.gameObject.SetActive(true);
+
+        Time.timeScale = 0f;
+    }
+
+    public void Kalah()
+    {
+        if (gameEnded) return;
+
+        gameEnded = true;
+        Debug.Log("KAMU KALAH!");
+
+        if (TextKalah != null)
+            TextKalah.gameObject.SetActive(true);
+
+        Time.timeScale = 0f;
     }
 }
